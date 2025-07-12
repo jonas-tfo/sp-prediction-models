@@ -78,14 +78,22 @@ def create_sliding_windows(sequence, labels, window_size, stride=1):
 
 
 
-def load_and_preprocess_data_window(fasta_path, windowSize, stride):
+def load_and_preprocess_data_window(fasta_path, windowSize, stride = 1, redundancyRemovalVersion = "short"):
     """
     Load FASTA data -> preprocess (homology reduction using mmseqs and task specific processing) -> use for sliding window approach
     params: path to the fasta file
     returns: windows, labels, ids as lists
     """
+
+    if redundancyRemovalVersion == "short":
+        script = "redundancy_removal_short.sh"
+    elif redundancyRemovalVersion == "long":
+        script = "redundancy_removal_long.sh"
+    else:
+        print("Invalid redundancy removal version, terminating")
+        return
     
-    run_bash_script("mmseqprocessing.sh", fasta_path)
+    run_bash_script("redundancy_removal_short.sh", fasta_path)
 
     fasta_path = "./ml_filtered_results/ml_filtered_non_redundant.fasta"
 
