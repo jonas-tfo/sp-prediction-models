@@ -2,8 +2,6 @@ from sklearn.utils import resample
 import subprocess
 import pandas as pd
 
-SCRIPT_PATH = "/Users/jonas/Desktop/Uni/PBL/sp-prediction-models/data/data_processing/mmseqprocessing.sh"
-
 
 def run_bash_script(script_path, argument1): 
     """
@@ -93,7 +91,7 @@ def load_and_preprocess_data_window(fasta_path, windowSize, stride = 1, redundan
         print("Invalid redundancy removal version, terminating")
         return
     
-    run_bash_script("redundancy_removal_short.sh", fasta_path)
+    run_bash_script(script, fasta_path)
 
     fasta_path = "./ml_filtered_results/ml_filtered_non_redundant.fasta"
 

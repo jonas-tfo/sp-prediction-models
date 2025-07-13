@@ -1,4 +1,3 @@
-#!/bin/bash
 
 # MMseqs2 Homology Removal Script for Machine Learning Training
 # Removes sequences with high similarity to create non-redundant dataset
