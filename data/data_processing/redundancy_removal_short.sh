@@ -13,8 +13,8 @@ fi
 
 INPUT_FASTA="$1"
 INPUT_DIR=$(dirname "$(realpath "$INPUT_FASTA")")
-SIMILARITY_THRESHOLD="${2:-0.3}"
-COVERAGE_THRESHOLD="${3:-0.8}"
+SIMILARITY_THRESHOLD="${2:-0.3}" # default 30 percent
+COVERAGE_THRESHOLD="${3:-0.8}" # default 80 percent
 OUTPUT_PREFIX="filtered"
 
 if [ ! -f "$INPUT_FASTA" ]; then
