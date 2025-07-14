@@ -95,10 +95,10 @@ echo "Extracting representatives..."
 mmseqs result2repseq "${OUTPUT_PREFIX}_db" "${OUTPUT_PREFIX}_clu" "${OUTPUT_PREFIX}_rep"
 mmseqs result2flat "${OUTPUT_PREFIX}_db" "${OUTPUT_PREFIX}_db" "${OUTPUT_PREFIX}_rep" "${OUTPUT_PREFIX}_representatives.fasta"
 
-# Create final output with labels if they existed
+# Create final output with labels if they existed (3 line fasta format)
 if [ "$HAS_LABELS" = true ]; then
     echo "Adding labels back to representatives..."
-    LABELS_FULL_PATH=$(realpath "${INPUT_FASTA}.labels.txt")
+    LABELS_FULL_PATH=$(realpath "${INPUT_FASTA}.labels.txt") # stores id line, tab, label
     
     # Create the final output with 3-line format
     awk '
@@ -121,7 +121,7 @@ if [ "$HAS_LABELS" = true ]; then
             print "Unknown"
         }
     }
-    ' "${OUTPUT_PREFIX}_representatives.fasta" > "${OUTPUT_PREFIX}_non_redundant.fasta"
+    ' "${OUTPUT_PREFIX}_representatives.fasta" > "${OUTPUT_PREFIX}_non_redundant.fasta" # contains the ids and aa sequences (no labels)
 else
     # Just copy the representatives file
     cp "${OUTPUT_PREFIX}_representatives.fasta" "${OUTPUT_PREFIX}_non_redundant.fasta"
@@ -146,5 +146,3 @@ fi
 if [ -f "${INPUT_FASTA}.labels.txt" ]; then
     rm -f "${INPUT_FASTA}.labels.txt"
 fi
-
-echo "Done!"
