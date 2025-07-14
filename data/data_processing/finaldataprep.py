@@ -36,9 +36,7 @@ def run_bash_script(script_path, fastaPath):
 
 def load_and_preprocess_data(fastaPath: str, outputPath: str, redundancyRemovalVersion: str = "short") -> str:
     """
-    Load FASTA data -> preprocess (homology reduction using mmseqs and task specific processing) -> use for sliding window approach
-    params: path to the fasta file
-    returns: windows, labels, ids as lists
+    Load FASTA data -> homology reduction using mmseqs -> task specific processing
     """
 
     scriptDir = os.path.dirname(os.path.abspath(__file__))
@@ -95,12 +93,11 @@ def load_and_preprocess_data(fastaPath: str, outputPath: str, redundancyRemovalV
     df = df_raw[~df_raw["label"].str.contains("P")]
 
     # Save to CSV
-    output_csv_path = os.path.join(dataDir, "processed", "processed_sequences.csv")
-    df.to_csv(output_csv_path, index=False)
-    print(f"Processed data saved to {output_csv_path}")
+    df.to_csv(outputPath, index=False)
+    print(f"Processed data saved to {outputPath}")
 
     
 
 if __name__ == "__main__":
     load_and_preprocess_data("/Users/jonas/Desktop/Uni/PBL/sp-prediction-models/data/raw/complete_set_unpartitioned.fasta", \
-                              "/Users/jonas/Desktop/Uni/PBL/sp-prediction-models/data/processed/processed_data.fasta")
+                              "/Users/jonas/Desktop/Uni/PBL/sp-prediction-models/data/processed/processed_data.csv")
