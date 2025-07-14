@@ -3,21 +3,12 @@ import subprocess
 import pandas as pd
 
 
-def run_bash_script(script_path, argument1): 
+def run_bash_script(script_path, fastaPath): 
     """
-    Runs a bash script and passes arguments to it.
-
-    Args:
-        script_path: The path to the bash script.
-        argument1: The first argument to pass to the script.
-        argument2: The second argument to pass to the script. # Add more as required
-
-    Returns:
-        A subprocess.CompletedProcess object containing the results of the execution.
+    Runs a bash script and passes fasta path to it, to be used with redudancy reduction
     """
     try:
-        # Correctly construct the command list:
-        command = ['bash', script_path, argument1] # Add more arguments as needed
+        command = ['bash', script_path, fastaPath] 
         result = subprocess.run(command, capture_output=True, text=True, check=True)
 
         print("Bash script output:")
@@ -34,13 +25,103 @@ def run_bash_script(script_path, argument1):
         print(f"Error running bash script: {e}")
         print(f"Return code: {e.returncode}")
         print(f"Standard error:\n{e.stderr}")
-        return None  # Or raise the exception, depending on your error handling strategy
+        return None  
     except FileNotFoundError:
         print(f"Script not found: {script_path}")
         return None
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
         return None
+
+def load_and_preprocess_data(finalFasta: str, redundancyRemovalVersion: str = "short") -> str:
+    """
+    Load FASTA data -> preprocess (homology reduction using mmseqs and task specific processing) -> use for sliding window approach
+    params: path to the fasta file
+    returns: windows, labels, ids as lists
+    """
+
+    if redundancyRemovalVersion == "short":
+        script = "redundancy_removal_short.sh"
+    elif redundancyRemovalVersion == "long":
+        script = "redundancy_removal_long.sh"
+    else:
+        print("Invalid redundancy removal version, terminating")
+        return
+    
+    run_bash_script(script, fasta_path)
+
+    fasta_path = "./ml_filtered_results/ml_filtered_non_redundant.fasta"
+
+    records = []
+
+    with open(fasta_path, "r") as f:
+        current_record = None
+        for line in f:
+            if line.startswith(">"):
+                if current_record is not None:
+                    if current_record["sequence"] is not None and current_record["label"] is not None:
+                        records.append(current_record)
+
+                uniprot_ac, kingdom, type_ = line[1:].strip().split("|")
+                current_record = {
+                    "uniprot_ac": uniprot_ac,
+                    "kingdom": kingdom,
+                    "type": type_,
+                    "sequence": None,
+                    "label": None
+                }
+            else:
+                if current_record["sequence"] is None:
+                    current_record["sequence"] = line.strip()
+                elif current_record["label"] is None:
+                    current_record["label"] = line.strip()
+
+        # Add last record
+        if current_record is not None:
+            if current_record["sequence"] is not None and current_record["label"] is not None:
+                records.append(current_record)
+
+    print(f"Total records loaded: {len(records)}")
+
+    # Convert to DataFrame
+    df_raw = pd.DataFrame(records)
+
+    # Filter out sequences with 'P' in labels (if needed)
+    df = df_raw[~df_raw["label"].str.contains("P")]
+
+    # Map signal peptide types to binary classification
+    df["has_signal_peptide"] = df["type"].map({
+        "NO_SP": 0,
+        "LIPO": 1,
+        "SP": 1,
+        "TAT": 1,
+        "TATLIPO": 1
+    })
+
+    # Balance the dataset at sequence level first
+    df_majority = df[df["has_signal_peptide"] == 0]
+    df_minority = df[df["has_signal_peptide"] == 1]
+
+    if not df_minority.empty and not df_majority.empty:
+
+        n_samples = min(len(df_majority), 5000) # Limit samples to 5000 to prevent high ram usage
+        df_majority_sampled = resample(
+            df_majority,
+            replace=False, # sample without replacement
+            n_samples=n_samples,
+            random_state=42
+        )
+        df_balanced = pd.concat([df_majority_sampled, df_minority]) # Include all minority samples
+    else:
+        df_balanced = df.copy()
+
+
+    # Convert residue-level labels to binary
+    label_map = {'S': 1, 'T': 1, 'L': 1, 'I': 0, 'M': 0, 'O': 0}
+
+    # Apply the label map to the dataset
+    df_balanced["label"] = df_balanced["label"].apply(lambda s: s.map(label_map))
+
 
 
 def create_sliding_windows(sequence, labels, window_size, stride=1):
