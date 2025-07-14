@@ -1,6 +1,7 @@
 from sklearn.utils import resample
 import subprocess
 import pandas as pd
+import os
 
 
 def run_bash_script(script_path, fastaPath): 
@@ -33,28 +34,32 @@ def run_bash_script(script_path, fastaPath):
         print(f"An unexpected error occurred: {e}")
         return None
 
-def load_and_preprocess_data(finalFasta: str, redundancyRemovalVersion: str = "short") -> str:
+def load_and_preprocess_data(fastaPath: str, outputPath: str, redundancyRemovalVersion: str = "short") -> str:
     """
     Load FASTA data -> preprocess (homology reduction using mmseqs and task specific processing) -> use for sliding window approach
     params: path to the fasta file
     returns: windows, labels, ids as lists
     """
 
+    scriptDir = os.path.dirname(os.path.abspath(__file__))
+
     if redundancyRemovalVersion == "short":
-        script = "redundancy_removal_short.sh"
+        script = os.path.join(scriptDir, "redundancy_removal_short.sh")
     elif redundancyRemovalVersion == "long":
-        script = "redundancy_removal_long.sh"
+        script = os.path.join(scriptDir, "redundancy_removal_long.sh")
     else:
         print("Invalid redundancy removal version, terminating")
         return
     
-    run_bash_script(script, fasta_path)
+    run_bash_script(script, fastaPath)
 
-    fasta_path = "./ml_filtered_results/ml_filtered_non_redundant.fasta"
+    scriptDir = os.path.dirname(os.path.abspath(__file__))
+    dataDir = os.path.abspath(os.path.join(scriptDir, "..")) # get parent dir, which is where folder with target fasta is
+    processedFasta = os.path.join(dataDir, "redundancy_removal_results", "filtered_non_redundant.fasta")
 
     records = []
 
-    with open(fasta_path, "r") as f:
+    with open(processedFasta, "r") as f:
         current_record = None
         for line in f:
             if line.startswith(">"):
@@ -89,188 +94,13 @@ def load_and_preprocess_data(finalFasta: str, redundancyRemovalVersion: str = "s
     # Filter out sequences with 'P' in labels (if needed)
     df = df_raw[~df_raw["label"].str.contains("P")]
 
-    # Map signal peptide types to binary classification
-    df["has_signal_peptide"] = df["type"].map({
-        "NO_SP": 0,
-        "LIPO": 1,
-        "SP": 1,
-        "TAT": 1,
-        "TATLIPO": 1
-    })
+    # Save to CSV
+    output_csv_path = os.path.join(dataDir, "processed", "processed_sequences.csv")
+    df.to_csv(output_csv_path, index=False)
+    print(f"Processed data saved to {output_csv_path}")
 
-    # Balance the dataset at sequence level first
-    df_majority = df[df["has_signal_peptide"] == 0]
-    df_minority = df[df["has_signal_peptide"] == 1]
-
-    if not df_minority.empty and not df_majority.empty:
-
-        n_samples = min(len(df_majority), 5000) # Limit samples to 5000 to prevent high ram usage
-        df_majority_sampled = resample(
-            df_majority,
-            replace=False, # sample without replacement
-            n_samples=n_samples,
-            random_state=42
-        )
-        df_balanced = pd.concat([df_majority_sampled, df_minority]) # Include all minority samples
-    else:
-        df_balanced = df.copy()
-
-
-    # Convert residue-level labels to binary
-    label_map = {'S': 1, 'T': 1, 'L': 1, 'I': 0, 'M': 0, 'O': 0}
-
-    # Apply the label map to the dataset
-    df_balanced["label"] = df_balanced["label"].apply(lambda s: s.map(label_map))
-
-
-
-def create_sliding_windows(sequence, labels, window_size, stride=1):
-    """
-    Creates windows with a given size (the number of windows being determined by the stride) from given sequences and their corresponding labels
-    """
-    windows = []
-    window_labels = []
-    positions = []
-
-    # Pad sequence for edge cases
-    pad_size = window_size // 2 # so starts classification after padding, at first real encoding
-    padded_seq = 'X' * pad_size + sequence + 'X' * pad_size
-    padded_labels = [0] * pad_size + labels + [0] * pad_size
-
-    # Create sliding windows
-    for i in range(0, len(sequence), stride):
-        start_idx = i
-        end_idx = i + window_size
-
-        if end_idx <= len(padded_seq):
-            window_seq = padded_seq[start_idx:end_idx]
-            # Label for the center position of the window
-            center_idx = start_idx + pad_size # residue to predict
-            if center_idx < len(padded_labels):
-                center_label = padded_labels[center_idx]
-
-                windows.append(window_seq)
-                window_labels.append(center_label)
-                positions.append(i)  # Original position in sequence
-
-    return windows, window_labels, positions
-
-
-
-def load_and_preprocess_data_window(fasta_path, windowSize, stride = 1, redundancyRemovalVersion = "short"):
-    """
-    Load FASTA data -> preprocess (homology reduction using mmseqs and task specific processing) -> use for sliding window approach
-    params: path to the fasta file
-    returns: windows, labels, ids as lists
-    """
-
-    if redundancyRemovalVersion == "short":
-        script = "redundancy_removal_short.sh"
-    elif redundancyRemovalVersion == "long":
-        script = "redundancy_removal_long.sh"
-    else:
-        print("Invalid redundancy removal version, terminating")
-        return
     
-    run_bash_script(script, fasta_path)
 
-    fasta_path = "./ml_filtered_results/ml_filtered_non_redundant.fasta"
-
-    records = []
-
-    with open(fasta_path, "r") as f:
-        current_record = None
-        for line in f:
-            if line.startswith(">"):
-                if current_record is not None:
-                    if current_record["sequence"] is not None and current_record["label"] is not None:
-                        records.append(current_record)
-
-                uniprot_ac, kingdom, type_ = line[1:].strip().split("|")
-                current_record = {
-                    "uniprot_ac": uniprot_ac,
-                    "kingdom": kingdom,
-                    "type": type_,
-                    "sequence": None,
-                    "label": None
-                }
-            else:
-                if current_record["sequence"] is None:
-                    current_record["sequence"] = line.strip()
-                elif current_record["label"] is None:
-                    current_record["label"] = line.strip()
-
-        # Add last record
-        if current_record is not None:
-            if current_record["sequence"] is not None and current_record["label"] is not None:
-                records.append(current_record)
-
-    print(f"Total records loaded: {len(records)}")
-
-    # Convert to DataFrame
-    df_raw = pd.DataFrame(records)
-
-    # Filter out sequences with 'P' in labels (if needed)
-    df = df_raw[~df_raw["label"].str.contains("P")]
-
-    # Map signal peptide types to binary classification
-    df["has_signal_peptide"] = df["type"].map({
-        "NO_SP": 0,
-        "LIPO": 1,
-        "SP": 1,
-        "TAT": 1,
-        "TATLIPO": 1
-    })
-
-    # Balance the dataset at sequence level first
-    df_majority = df[df["has_signal_peptide"] == 0]
-    df_minority = df[df["has_signal_peptide"] == 1]
-
-    if not df_minority.empty and not df_majority.empty:
-
-        n_samples = min(len(df_majority), 5000) # Limit samples to 5000 to prevent high ram usage
-        df_majority_sampled = resample(
-            df_majority,
-            replace=False, # sample without replacement
-            n_samples=n_samples,
-            random_state=42
-        )
-        df_balanced = pd.concat([df_majority_sampled, df_minority]) # Include all minority samples
-    else:
-        df_balanced = df.copy()
-
-
-    # Convert residue-level labels to binary
-    label_map = {'S': 1, 'T': 1, 'L': 1, 'I': 0, 'M': 0, 'O': 0}
-
-    # Create sliding windows for all sequences
-    all_windows = []
-    all_labels = []
-    all_seq_ids = []
-
-    for idx, row in df_balanced.iterrows():
-        sequence = row["sequence"]
-        label_string = row["label"]
-
-        # Convert label string to binary array
-        residue_labels = [label_map.get(c, 0) for c in label_string]
-
-        # Skip sequences where label length doesn't match sequence length
-        if len(residue_labels) != len(sequence):
-            print("A sequence length is not equal to the label length")
-            continue
-
-        # Create sliding windows for this sequence
-        windows, window_labels, positions = create_sliding_windows(
-            sequence, residue_labels, windowSize, stride
-        )
-
-        all_windows.extend(windows)
-        all_labels.extend(window_labels)
-        all_seq_ids.extend([idx] * len(windows))
-
-    print(f"Total windows created: {len(all_windows)}")
-    print(f"Signal peptide windows: {sum(all_labels)}")
-    print(f"Non-signal peptide windows: {len(all_labels) - sum(all_labels)}")
-
-    return all_windows, all_labels, all_seq_ids
+if __name__ == "__main__":
+    load_and_preprocess_data("/Users/jonas/Desktop/Uni/PBL/sp-prediction-models/data/raw/complete_set_unpartitioned.fasta", \
+                              "/Users/jonas/Desktop/Uni/PBL/sp-prediction-models/data/processed/processed_data.fasta")
