@@ -34,7 +34,7 @@ def run_bash_script(script_path, fastaPath):
         print(f"An unexpected error occurred: {e}")
         return None
 
-def load_and_preprocess_data(fastaPath: str, outputPath: str, redundancyRemovalVersion: str = "short") -> str:
+def load_and_preprocess_data(fastaPath: str, redundancyRemovalVersion: str = "short"):
     """
     Load FASTA data -> homology reduction using mmseqs -> task specific processing
     """
@@ -92,12 +92,8 @@ def load_and_preprocess_data(fastaPath: str, outputPath: str, redundancyRemovalV
     # Filter out sequences with 'P' in labels (if needed)
     df = df_raw[~df_raw["label"].str.contains("P")]
 
-    # Save to CSV
-    df.to_csv(outputPath, index=False)
-    print(f"Processed data saved to {outputPath}")
-
+    return df
     
 
 if __name__ == "__main__":
-    load_and_preprocess_data("/Users/jonas/Desktop/Uni/PBL/sp-prediction-models/data/raw/complete_set_unpartitioned.fasta", \
-                              "/Users/jonas/Desktop/Uni/PBL/sp-prediction-models/data/processed/processed_data.csv")
+    df = load_and_preprocess_data("/Users/jonas/Desktop/Uni/PBL/sp-prediction-models/data/raw/complete_set_unpartitioned.fasta")
