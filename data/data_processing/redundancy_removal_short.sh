@@ -35,6 +35,7 @@ echo "Coverage threshold: $COVERAGE_THRESHOLD"
 FIRST_THREE_LINES=$(head -3 "$INPUT_FASTA")
 HAS_LABELS=false
 
+# the third line of the fasta file has to start and end with labels, so can only contain labels 
 if echo "$FIRST_THREE_LINES" | grep -q "^>.*" && echo "$FIRST_THREE_LINES" | tail -1 | grep -q "^[IOMSLT]*$"; then
     echo "Converting 3-line format to standard FASTA and preserving labels..."
     HAS_LABELS=true
