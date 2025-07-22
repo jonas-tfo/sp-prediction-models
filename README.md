@@ -43,3 +43,4 @@ This project focuses on the classification of amino acid sequences and/or the co
 
 ### 2-State Binary Classifiers
 
+  - simple one hot encoding combined with a linear layer 
