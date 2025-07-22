@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# MMseqs2 Homology Removal Script with Label Preservation
+# MMseqs2 Homology Removal Script 
 # Usage: ./remove_homology.sh input.fasta [similarity_threshold] [coverage_threshold]
 
 set -e
