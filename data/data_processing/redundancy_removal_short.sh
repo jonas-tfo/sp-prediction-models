@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# MMseqs2 Homology Removal Script 
+# MMseqs2 Homology Removal Script
 # Usage: ./remove_homology.sh input.fasta [similarity_threshold] [coverage_threshold]
 
 set -e
@@ -14,7 +14,7 @@ fi
 INPUT_FASTA="$1"
 INPUT_DIR=$(dirname "$(realpath "$INPUT_FASTA")")
 SIMILARITY_THRESHOLD="${2:-0.3}" # default 30 percent
-COVERAGE_THRESHOLD="${3:-0.8}" # default 80 percent
+COVERAGE_THRESHOLD="${3:-0.8}"   # default 80 percent
 OUTPUT_PREFIX="filtered"
 
 if [ ! -f "$INPUT_FASTA" ]; then
@@ -22,7 +22,7 @@ if [ ! -f "$INPUT_FASTA" ]; then
     exit 1
 fi
 
-if ! command -v mmseqs &> /dev/null; then
+if ! command -v mmseqs &>/dev/null; then
     echo "Error: MMseqs2 is not installed or not in PATH"
     exit 1
 fi
@@ -35,14 +35,14 @@ echo "Coverage threshold: $COVERAGE_THRESHOLD"
 FIRST_THREE_LINES=$(head -3 "$INPUT_FASTA")
 HAS_LABELS=false
 
-# the third line of the fasta file has to start and end with labels, so can only contain labels 
+# the third line of the fasta file has to start and end with labels, so can only contain labels
 if echo "$FIRST_THREE_LINES" | grep -q "^>.*" && echo "$FIRST_THREE_LINES" | tail -1 | grep -q "^[IOMSLT]*$"; then
     echo "Converting 3-line format to standard FASTA and preserving labels..."
     HAS_LABELS=true
-    
+
     TEMP_FASTA="${INPUT_FASTA}.temp.fasta"
     LABELS_FILE="${INPUT_FASTA}.labels.txt"
-    
+
     # Extract sequences and create label mapping
     awk '
     BEGIN { seq_count = 0 }
@@ -61,7 +61,7 @@ if echo "$FIRST_THREE_LINES" | grep -q "^>.*" && echo "$FIRST_THREE_LINES" | tai
         print header "\t" labels > "'"$LABELS_FILE"'"
     }
     ' "$INPUT_FASTA"
-    
+
     INPUT_PROCESSED="$TEMP_FASTA"
 else
     INPUT_PROCESSED="$INPUT_FASTA"
@@ -100,7 +100,7 @@ mmseqs result2flat "${OUTPUT_PREFIX}_db" "${OUTPUT_PREFIX}_db" "${OUTPUT_PREFIX}
 if [ "$HAS_LABELS" = true ]; then
     echo "Adding labels back to representatives..."
     LABELS_FULL_PATH=$(realpath "${INPUT_FASTA}.labels.txt") # stores id line, tab, label
-    
+
     # Create the final output with 3-line format
     awk '
     BEGIN {
@@ -122,7 +122,7 @@ if [ "$HAS_LABELS" = true ]; then
             print "Unknown"
         }
     }
-    ' "${OUTPUT_PREFIX}_representatives.fasta" > "${OUTPUT_PREFIX}_non_redundant.fasta" # contains the ids and aa sequences (no labels)
+    ' "${OUTPUT_PREFIX}_representatives.fasta" >"${OUTPUT_PREFIX}_non_redundant.fasta" # contains the ids and aa sequences (no labels)
 else
     # Just copy the representatives file
     cp "${OUTPUT_PREFIX}_representatives.fasta" "${OUTPUT_PREFIX}_non_redundant.fasta"
@@ -135,7 +135,7 @@ REMOVED_COUNT=$((ORIGINAL_COUNT - FINAL_COUNT))
 echo ""
 echo "Results:"
 echo "  Original: $ORIGINAL_COUNT sequences"
-echo "  Final: $FINAL_COUNT sequences"  
+echo "  Final: $FINAL_COUNT sequences"
 echo "  Removed: $REMOVED_COUNT sequences"
 echo "  Output: redundancy_removal_results/${OUTPUT_PREFIX}_non_redundant.fasta"
 

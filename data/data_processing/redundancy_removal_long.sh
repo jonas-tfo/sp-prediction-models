@@ -1,9 +1,8 @@
-
 # MMseqs2 Homology Removal Script for Machine Learning Training
 # Removes sequences with high similarity to create non-redundant dataset
 # Usage: ./remove_homology.sh input.fasta [similarity_threshold] [coverage_threshold]
 
-set -e  # Exit on any error
+set -e # Exit on any error
 
 # Input validation
 if [ $# -lt 1 ]; then
@@ -22,8 +21,8 @@ if [ $# -lt 1 ]; then
 fi
 
 INPUT_FASTA="$1"
-SIMILARITY_THRESHOLD="${2:-0.3}"  # Default 30% similarity
-COVERAGE_THRESHOLD="${3:-0.8}"    # Default 80% coverage -> min 80 percent match between sequences 
+SIMILARITY_THRESHOLD="${2:-0.3}" # Default 30% similarity
+COVERAGE_THRESHOLD="${3:-0.8}"   # Default 80% coverage -> min 80 percent match between sequences
 OUTPUT_PREFIX="ml_filtered"
 
 # Check if input file exists and validate format
@@ -39,7 +38,7 @@ if echo "$FIRST_THREE_LINES" | grep -q "^>.*" && echo "$FIRST_THREE_LINES" | tai
     echo "Detected 3-line format (header, sequence, quality/labels)"
     echo "Label characters detected: $(echo "$FIRST_THREE_LINES" | tail -1 | grep -o . | sort -u | tr '\n' ' ')"
     echo "Converting to standard FASTA format..."
-    
+
     # Create temporary standard FASTA file
     TEMP_FASTA="${INPUT_FASTA}.temp_standard.fasta"
     awk '
@@ -55,11 +54,11 @@ if echo "$FIRST_THREE_LINES" | grep -q "^>.*" && echo "$FIRST_THREE_LINES" | tai
         print $0
     }
     # Skip the 3rd line (labels: I, O, M, S, L, T)
-    ' "$INPUT_FASTA" > "$TEMP_FASTA"
-    
+    ' "$INPUT_FASTA" >"$TEMP_FASTA"
+
     INPUT_FASTA_PROCESSED="$TEMP_FASTA"
     echo "Converted file saved as: $TEMP_FASTA"
-    
+
     # Show a sample of what was detected
     echo "Sample conversion:"
     echo "Original (first 9 lines):"
@@ -72,7 +71,7 @@ else
 fi
 
 # Check if MMseqs2 is installed
-if ! command -v mmseqs &> /dev/null; then
+if ! command -v mmseqs &>/dev/null; then
     echo "Error: MMseqs2 is not installed or not in PATH"
     echo "Please install MMseqs2 first: https://github.com/soedinglab/MMseqs2"
     exit 1
@@ -131,9 +130,9 @@ mmseqs createtsv "${OUTPUT_PREFIX}_db" "${OUTPUT_PREFIX}_db" "${OUTPUT_PREFIX}_d
 mmseqs createtsv "${OUTPUT_PREFIX}_db" "${OUTPUT_PREFIX}_db" "${OUTPUT_PREFIX}_rep" "${OUTPUT_PREFIX}_rep_ids.tsv"
 
 # Find removed sequences (those not selected as representatives)
-cut -f1 "${OUTPUT_PREFIX}_all_ids.tsv" | sort > all_ids.tmp
-cut -f1 "${OUTPUT_PREFIX}_rep_ids.tsv" | sort > rep_ids.tmp
-comm -23 all_ids.tmp rep_ids.tmp > "${OUTPUT_PREFIX}_removed_ids.txt"
+cut -f1 "${OUTPUT_PREFIX}_all_ids.tsv" | sort >all_ids.tmp
+cut -f1 "${OUTPUT_PREFIX}_rep_ids.tsv" | sort >rep_ids.tmp
+comm -23 all_ids.tmp rep_ids.tmp >"${OUTPUT_PREFIX}_removed_ids.txt"
 
 # Step 6: Generate comprehensive statistics
 echo "Step 6: Generating statistics..."
@@ -148,13 +147,13 @@ REDUCTION_PERCENT=$(echo "scale=2; ($REMOVED_COUNT * 100) / $ORIGINAL_COUNT" | b
 RETENTION_PERCENT=$(echo "scale=2; ($FINAL_COUNT * 100) / $ORIGINAL_COUNT" | bc -l)
 
 # Cluster size analysis
-cut -f1 "${OUTPUT_PREFIX}_clusters.tsv" | sort | uniq -c | sort -nr > "${OUTPUT_PREFIX}_cluster_sizes.txt"
+cut -f1 "${OUTPUT_PREFIX}_clusters.tsv" | sort | uniq -c | sort -nr >"${OUTPUT_PREFIX}_cluster_sizes.txt"
 TOTAL_CLUSTERS=$(cut -f1 "${OUTPUT_PREFIX}_clusters.tsv" | sort -u | wc -l)
 SINGLETONS=$(grep -c "^\s*1 " "${OUTPUT_PREFIX}_cluster_sizes.txt" || echo "0")
 MAX_CLUSTER_SIZE=$(head -1 "${OUTPUT_PREFIX}_cluster_sizes.txt" | awk '{print $1}')
 
 # Create comprehensive summary report
-cat > "${OUTPUT_PREFIX}_ML_summary.txt" << EOF
+cat >"${OUTPUT_PREFIX}_ML_summary.txt" <<EOF
 MMseqs2 Homology Removal Summary for ML Training
 ================================================
 Analysis Date: $(date)
@@ -186,16 +185,16 @@ Files Generated:
 - ${OUTPUT_PREFIX}_ML_summary.txt: This summary file
 
 Recommendations for ML Training:
-$(if (( $(echo "$REDUCTION_PERCENT > 50" | bc -l) )); then
+$(if (($(echo "$REDUCTION_PERCENT > 50" | bc -l))); then
     echo "- High redundancy detected (${REDUCTION_PERCENT}% reduction)"
     echo "- Dataset is now suitable for ML training with reduced overfitting risk"
 else
     echo "- Moderate redundancy detected (${REDUCTION_PERCENT}% reduction)"
     echo "- Consider lowering similarity threshold if more aggressive filtering is needed"
 fi)
-$(if (( $(echo "$FINAL_COUNT < 1000" | bc -l) )); then
+$(if (($(echo "$FINAL_COUNT < 1000" | bc -l))); then
     echo "- WARNING: Small dataset ($FINAL_COUNT sequences) - consider collecting more data"
-elif (( $(echo "$FINAL_COUNT < 5000" | bc -l) )); then
+elif (($(echo "$FINAL_COUNT < 5000" | bc -l))); then
     echo "- Moderate dataset size ($FINAL_COUNT sequences) - should be sufficient for many ML tasks"
 else
     echo "- Large dataset ($FINAL_COUNT sequences) - excellent for ML training"
@@ -204,7 +203,7 @@ EOF
 
 # Step 7: Create training/validation split suggestions
 echo "Step 7: Creating ML training suggestions..."
-cat > "${OUTPUT_PREFIX}_ML_training_guide.txt" << EOF
+cat >"${OUTPUT_PREFIX}_ML_training_guide.txt" <<EOF
 Machine Learning Training Guide
 ==============================
 
